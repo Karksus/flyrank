@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response, status, Depends
+from fastapi import FastAPI, Response, status, Depends, Header
 from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
@@ -218,3 +218,20 @@ def login(auth_in: AuthRequest, response: Response):
         "access_token": result.session.access_token,
         "refresh_token": result.session.refresh_token,
     }
+
+@app.get("/public/info")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+@app.get("/protected/profile")
+def protected_profile(response: Response, authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Access token required"}
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Access token required"}
+
+    return {"message": "You made it! This is your protected profile.", "token": token}
