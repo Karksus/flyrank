@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
 from typing import Optional
-from supabase import create_client, Client
+from supabase import AuthError, create_client, Client
 
 load_dotenv()
 
@@ -32,6 +32,10 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: str | None = None
     done: bool | None = None
+
+class AuthRequest(BaseModel):
+    email: str | None = None
+    password: str | None = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -90,6 +94,16 @@ class SqlOperator:
     def delete(self, task: Tasks) -> None:
         self.session.delete(task)
         self.session.commit()
+
+class AuthOperator:
+    def __init__(self, client: Client):
+        self.client = client
+
+    def signup(self, email: str, password: str):
+        return self.client.auth.sign_up({"email": email, "password": password})
+
+    def login(self, email: str, password: str):
+        return self.client.auth.sign_in_with_password({"email": email, "password": password})
 
 @app.get("/")
 def root():
@@ -162,3 +176,45 @@ def delete_task(task_id: int, response: Response, session: Session = Depends(get
     
     db.delete(task)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@app.post("/auth/signup")
+def signup(auth_in: AuthRequest, response: Response):
+    if not auth_in.email or not auth_in.password:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"error": "Bad Request"}
+
+    auth = AuthOperator(supabase)
+    try:
+        result = auth.signup(auth_in.email.strip(), auth_in.password)
+    except AuthError as err:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"error": str(err)}
+
+    if result.user is None:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"error": "Bad Request"}
+
+    response.status_code = status.HTTP_201_CREATED
+    return result.user.model_dump()
+
+@app.post("/auth/login")
+def login(auth_in: AuthRequest, response: Response):
+    if not auth_in.email or not auth_in.password:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"error": "Bad Request"}
+
+    auth = AuthOperator(supabase)
+    try:
+        result = auth.login(auth_in.email.strip(), auth_in.password)
+    except AuthError:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Invalid login credentials"}
+
+    if result.session is None:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Invalid login credentials"}
+
+    return {
+        "access_token": result.session.access_token,
+        "refresh_token": result.session.refresh_token,
+    }
