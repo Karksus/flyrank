@@ -5,8 +5,13 @@ from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
 from typing import Optional
+from supabase import create_client, Client
 
 load_dotenv()
+
+supb_url: str = os.environ.get("SUPABASE_URL")
+supb_key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(supb_url, supb_key)
 
 class Tasks(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -30,6 +35,7 @@ class TaskUpdate(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Server running and connected to Supabase", flush=True)
     SQLModel.metadata.create_all(engine)
     
     with Session(engine) as session:
