@@ -113,11 +113,11 @@ The project holds a full CRUD example, with `GET`, `POST`, `PUT` and `DELETE` HT
 
 All three protected routes are guarded by the same reusable `get_current_user` dependency, the Swagger **Authorize** padlock (`HTTPBearer`) accepts a token once and unlocks all of them.
 
-> **TODO:** add screenshot of the Authorize padlock in `/docs` here.
+<img width="1268" height="242" alt="image" src="https://github.com/user-attachments/assets/d830f4f8-4a24-42b3-9f14-349107a4f3eb" />
 
-<!-- PLACEHOLDER: Authorize padlock screenshot
-<img width="..." height="..." alt="Authorize padlock in Swagger" src="https://github.com/user-attachments/assets/..." />
--->
+<img width="1256" height="172" alt="image" src="https://github.com/user-attachments/assets/cec56dcb-1118-4d8a-ac92-5996eb60bbae" />
+
+
 
 
 ### GET /ROOT - Holds API info
