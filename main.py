@@ -105,6 +105,9 @@ class AuthOperator:
     def login(self, email: str, password: str):
         return self.client.auth.sign_in_with_password({"email": email, "password": password})
 
+    def get_user(self, token: str):
+        return self.client.auth.get_user(token)
+
 @app.get("/")
 def root():
     return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
@@ -234,4 +237,20 @@ def protected_profile(response: Response, authorization: Optional[str] = Header(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return {"error": "Access token required"}
 
-    return {"message": "You made it! This is your protected profile.", "token": token}
+    auth = AuthOperator(supabase)
+    try:
+        result = auth.get_user(token)
+    except AuthError:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Invalid or expired token"}
+
+    if result is None or result.user is None:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return {"error": "Invalid or expired token"}
+
+    user = result.user
+    return {
+        "id": user.id,
+        "email": user.email,
+        "created_at": user.created_at,
+    }
