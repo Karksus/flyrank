@@ -101,6 +101,24 @@ The project holds a full CRUD example, with `GET`, `POST`, `PUT` and `DELETE` HT
 |PUT   |/tasks/{task_id}|Updates an existing task's title and/or completion status|
 |DELETE|/tasks/{task_id}|Removes a task by its ID                                 |
 
+### Authentication API reference
+
+|Method|Endpoint              |Description                                  |Auth required |
+|------|----------------------|---------------------------------------------|--------------|
+|POST  |/auth/signup          |Creates an account (Supabase)                |No            |
+|POST  |/auth/login           |Logs in, returns `access_token` + `refresh_token`|No         |
+|POST  |/auth/logout          |Revokes the session via `sign_out()`         |Yes (`Bearer`)|
+|GET   |/protected/profile    |Returns the current user's metadata          |Yes (`Bearer`)|
+|GET   |/protected/dashboard  |Personalized dashboard message               |Yes (`Bearer`)|
+
+All three protected routes are guarded by the same reusable `get_current_user` dependency, the Swagger **Authorize** padlock (`HTTPBearer`) accepts a token once and unlocks all of them.
+
+> **TODO:** add screenshot of the Authorize padlock in `/docs` here.
+
+<!-- PLACEHOLDER: Authorize padlock screenshot
+<img width="..." height="..." alt="Authorize padlock in Swagger" src="https://github.com/user-attachments/assets/..." />
+-->
+
 
 ### GET /ROOT - Holds API info
 ```bash
