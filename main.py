@@ -1,6 +1,13 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response, status, Depends, Header
+from fastapi import (
+    FastAPI,
+    Response,
+    status,
+    Depends,
+    Header,
+    HTTPException,
+)
 from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from contextlib import asynccontextmanager
@@ -107,6 +114,45 @@ class AuthOperator:
 
     def get_user(self, token: str):
         return self.client.auth.get_user(token)
+
+    def sign_out(self, token: str):
+        return self.client.auth.admin.sign_out(token)
+
+
+def get_token(authorization: Optional[str] = Header(None)) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Access token required",
+        )
+
+    return token
+
+
+def get_current_user(token: str = Depends(get_token)) -> object:
+    auth = AuthOperator(supabase)
+    try:
+        result = auth.get_user(token)
+    except AuthError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    if result is None or result.user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+
+    return result.user
 
 @app.get("/")
 def root():
@@ -227,30 +273,22 @@ def public_info():
     return {"message": "Welcome stranger! This info is public."}
 
 @app.get("/protected/profile")
-def protected_profile(response: Response, authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return {"error": "Access token required"}
-
-    token = authorization.split(" ", 1)[1].strip()
-    if not token:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return {"error": "Access token required"}
-
-    auth = AuthOperator(supabase)
-    try:
-        result = auth.get_user(token)
-    except AuthError:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return {"error": "Invalid or expired token"}
-
-    if result is None or result.user is None:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return {"error": "Invalid or expired token"}
-
-    user = result.user
+def protected_profile(user: object = Depends(get_current_user)):
     return {
         "id": user.id,
         "email": user.email,
         "created_at": user.created_at,
     }
+
+@app.get("/protected/dashboard")
+def protected_dashboard(user: object = Depends(get_current_user)):
+    return {
+        "message": f"Welcome back, {user.email}!",
+        "account_created_at": user.created_at,
+    }
+
+@app.post("/auth/logout")
+async def logout(token: str = Depends(get_token)):
+    auth = AuthOperator(supabase)
+    auth.sign_out(token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
